@@ -1,36 +1,47 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Image Audit Tool
+
+A Next.js application designed to audit your web pages and provide insights into responsive image optimization. It analyzes how your images render across different device viewports and offers size optimization recommendations to improve page performance and save bandwidth.
+
+## Features
+
+- **Multi-Viewport Auditing:** Automatically load a target URL simultaneously across Desktop, Tablet, and Mobile viewports (or any custom viewports you define).
+- **Network Interception:** Fast-tracks the auditing process by optionally blocking irrelevant domains or unsupported image formats via Playwright network interception.
+- **Image Filters:**
+  - **Allowed Domains:** Restrict the audit to specific domains (e.g., your CDN) to save time and ignore third-party tracking pixels.
+  - **Allowed Formats:** Filter by image extension (`png`, `jpg`, `webp`, `avif`, `svg`, etc.) to focus on specific asset types.
+- **Smart Dimension Tracking:** Correctly tracks the maximum rendered dimensions of an image even if it is used multiple times on a single page.
+- **CSV Export:** Export your results directly to a CSV file for reporting.
 
 ## Getting Started
 
-First, run the development server:
+First, install the dependencies. The project uses `pnpm` for package management:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then, run the development server:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+pnpm dev
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the Dashboard.
 
-## Learn More
+## Usage
 
-To learn more about Next.js, take a look at the following resources:
+1. **Target URL:** Enter the full URL (e.g., `https://example.com`) you want to audit.
+2. **Viewports:** Add, remove, or modify the viewports (Width x Height) you want to test against.
+3. **Allowed Domains (Optional):** Enter a comma-separated list of domains (e.g., `cdn.example.com`). Only images from these domains will be downloaded and audited.
+4. **Allowed Formats (Optional):** Select specific image formats to include in the audit. Deselect all to audit every format.
+5. Click **Run Audit**.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Once the audit completes, a table will be displayed showing the intrinsic size of each image, its rendered size on each viewport, and a suggested optimized size (the maximum dimensions required across all tested viewports).
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Technologies Used
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [Next.js](https://nextjs.org/) (App Router)
+- [React](https://react.dev/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Playwright](https://playwright.dev/) (Headless Chromium)
+- [shadcn/ui](https://ui.shadcn.com/)
