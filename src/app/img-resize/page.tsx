@@ -2,8 +2,8 @@ import { Metadata } from "next";
 import { ImageResizeForm } from "@/components/ImageResizeForm";
 
 export const metadata: Metadata = {
-  title: "Image Resizer Tool | Optimize Web Images",
-  description: "Quickly resize images from your local device or via URL.",
+  title: "Image Resizer",
+  description: "Instantly resize and compress your local images or web URLs into the highly optimized AVIF format. Retain vector scalability for SVGs.",
 };
 
 export default function ImageResizePage() {
