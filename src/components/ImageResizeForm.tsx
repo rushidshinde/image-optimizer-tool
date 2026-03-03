@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Upload, Link as LinkIcon, Download, Loader2, Image as ImageIcon, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +17,7 @@ export function ImageResizeForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>("");
   const [resultObjUrl, setResultObjUrl] = useState<string | null>(null);
+  const [resultExtension, setResultExtension] = useState<string>("png");
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
@@ -79,6 +81,18 @@ export function ImageResizeForm() {
       }
 
       const blob = await response.blob();
+      
+      // Determine extension from content-type or fallback to png
+      const contentType = response.headers.get("Content-Type") || "";
+      let ext = "png";
+      if (contentType.includes("jpeg") || contentType.includes("jpg")) ext = "jpg";
+      else if (contentType.includes("webp")) ext = "webp";
+      else if (contentType.includes("gif")) ext = "gif";
+      else if (contentType.includes("svg")) ext = "svg";
+      else if (contentType.includes("avif")) ext = "avif";
+      
+      setResultExtension(ext);
+      
       const objectUrl = URL.createObjectURL(blob);
       setResultObjUrl(objectUrl);
 
@@ -229,13 +243,15 @@ export function ImageResizeForm() {
                  <img src={resultObjUrl} alt="Resized Image" className="max-w-full h-auto max-h-[400px] object-contain" />
               </div>
               <div className="flex flex-col gap-4 min-w-[200px]">
-                <a
-                  href={resultObjUrl}
-                  download={`resized-image.png`}
-                  className="inline-flex items-center justify-center gap-2 px-8 py-3 bg-green-600 text-white font-medium rounded-md hover:bg-green-700 transition-colors shadow-sm cursor-pointer"
-                >
-                  <Download className="w-4 h-4" /> Download Image
-                </a>
+                <Button asChild className="px-8 py-6 font-medium shadow-sm cursor-pointer text-base rounded-md">
+                  <Link
+                    href={resultObjUrl}
+                    download={`resized-image.${resultExtension}`}
+                    target="_blank"
+                  >
+                    <Download className="w-5 h-5 mr-2" /> Download Image
+                  </Link>
+                </Button>
               </div>
             </div>
           </div>
