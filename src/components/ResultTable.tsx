@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import {
   Table,
   TableBody,
@@ -9,15 +10,132 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Download, Loader2, Archive } from "lucide-react";
+import JSZip from "jszip";
 import { AuditResult, Viewport } from "./Dashboard";
 
 export function ResultTable({ results, viewports }: { results: AuditResult[]; viewports: Viewport[] }) {
+  const [downloading, setDownloading] = useState<Record<number, boolean>>({});
+  const [downloadingAll, setDownloadingAll] = useState(false);
+
+  const handleDownload = async (item: AuditResult, index: number) => {
+    setDownloading(prev => ({ ...prev, [index]: true }));
+    try {
+      const suggestedWidth = item.suggested?.width || item.intrinsic?.width;
+      const suggestedHeight = item.suggested?.height || item.intrinsic?.height;
+      if (!suggestedWidth && !suggestedHeight) throw new Error("No dimensions available");
+
+      const formData = new FormData();
+      formData.append("imageUrl", item.src);
+      if (suggestedWidth) formData.append("width", suggestedWidth.toString());
+      if (suggestedHeight) formData.append("height", suggestedHeight.toString());
+
+      const response = await fetch("/api/resize", { method: "POST", body: formData });
+      if (!response.ok) throw new Error("Failed to resize");
+      
+      const blob = await response.blob();
+      const contentType = response.headers.get("Content-Type") || "";
+      let ext = "png";
+      if (contentType.includes("jpeg") || contentType.includes("jpg")) ext = "jpg";
+      else if (contentType.includes("webp")) ext = "webp";
+      else if (contentType.includes("gif")) ext = "gif";
+      else if (contentType.includes("svg")) ext = "svg";
+      else if (contentType.includes("avif")) ext = "avif";
+
+      const originalName = item.src.split("/").pop() || "image";
+      const baseName = originalName.split(".")[0] || "image";
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${baseName}_optimized.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download image", err);
+      alert("Failed to download optimized image.");
+    } finally {
+      setDownloading(prev => ({ ...prev, [index]: false }));
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    setDownloadingAll(true);
+    try {
+      const zip = new JSZip();
+      
+      const fetchImage = async (item: AuditResult, index: number) => {
+          const suggestedWidth = item.suggested?.width || item.intrinsic?.width;
+          const suggestedHeight = item.suggested?.height || item.intrinsic?.height;
+          const formData = new FormData();
+          formData.append("imageUrl", item.src);
+          if (suggestedWidth) formData.append("width", suggestedWidth.toString());
+          if (suggestedHeight) formData.append("height", suggestedHeight.toString());
+          
+          const response = await fetch("/api/resize", { method: "POST", body: formData });
+          if (!response.ok) return null;
+          
+          const blob = await response.blob();
+          const contentType = response.headers.get("Content-Type") || "";
+          let ext = "png";
+          if (contentType.includes("jpeg") || contentType.includes("jpg")) ext = "jpg";
+          else if (contentType.includes("webp")) ext = "webp";
+          else if (contentType.includes("gif")) ext = "gif";
+          else if (contentType.includes("svg")) ext = "svg";
+          else if (contentType.includes("avif")) ext = "avif";
+          
+          const originalName = item.src.split("/").pop() || `image_${index}`;
+          const baseName = originalName.split(".")[0] || `image_${index}`;
+          
+          return { name: `${baseName}_optimized.${ext}`, blob };
+      };
+
+      for (let i = 0; i < results.length; i += 5) {
+          const batch = results.slice(i, i + 5);
+          const batchResults = await Promise.all(batch.map((item, idx) => fetchImage(item, i + idx)));
+          for (const res of batchResults) {
+              if (res) zip.file(res.name, res.blob);
+          }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "optimized_images.zip";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to download zip", err);
+      alert("Failed to download optimized images.");
+    } finally {
+      setDownloadingAll(false);
+    }
+  };
+
   if (!results || results.length === 0) return null;
 
   return (
-    <Card className="overflow-hidden shadow-sm border-slate-200 mt-8">
-      <div className="overflow-x-auto">
-        <Table>
+    <div className="space-y-4 mt-8">
+      <div className="flex justify-between items-center">
+        <h3 className="text-lg font-semibold text-slate-800">Audit Results</h3>
+        <Button 
+          onClick={handleDownloadAll} 
+          disabled={downloadingAll}
+          className="bg-blue-600 hover:bg-blue-700 text-white cursor-pointer"
+        >
+          {downloadingAll ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Archive className="w-4 h-4 mr-2" />}
+          {downloadingAll ? `Generating ZIP...` : `Download All Optimized`}
+        </Button>
+      </div>
+      <Card className="overflow-hidden shadow-sm border-slate-200">
+        <div className="overflow-x-auto">
+          <Table>
           <TableHeader className="bg-slate-50">
             <TableRow>
               <TableHead className="w-[80px] font-semibold text-slate-700">Preview</TableHead>
@@ -27,6 +145,7 @@ export function ResultTable({ results, viewports }: { results: AuditResult[]; vi
                 <TableHead key={i} className="font-semibold text-slate-700">{vp.name} Rendered</TableHead>
               ))}
               <TableHead className="font-semibold text-blue-700">Suggested Optimized Size</TableHead>
+              <TableHead className="w-[100px] font-semibold text-slate-700 text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -115,11 +234,24 @@ export function ResultTable({ results, viewports }: { results: AuditResult[]; vi
                 <TableCell className="font-bold text-blue-600">
                   {item.suggested?.width}x{item.suggested?.height} px
                 </TableCell>
+                <TableCell className="text-right">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleDownload(item, idx)}
+                    disabled={downloading[idx]}
+                    title="Download optimized image"
+                    className="h-8 w-8 p-0 cursor-pointer"
+                  >
+                    {downloading[idx] ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  </Button>
+                </TableCell>
               </TableRow>
             ))}
           </TableBody>
         </Table>
       </div>
-    </Card>
+      </Card>
+    </div>
   );
 }

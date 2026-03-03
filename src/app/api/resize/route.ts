@@ -37,23 +37,37 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please provide target width or height." }, { status: 400 });
     }
 
-    // Process image with sharp
-    const optimizedBuffer = await sharp(inputBuffer)
+    const sharpInstance = sharp(inputBuffer);
+    const metadata = await sharpInstance.metadata();
+
+    // If it's an SVG, don't modify it at all
+    if (metadata.format === "svg") {
+      return new NextResponse(new Blob([new Uint8Array(inputBuffer)]), {
+        status: 200,
+        headers: {
+          "Content-Type": "image/svg+xml",
+          "Content-Disposition": `attachment; filename="resized-image.svg"`,
+        },
+      });
+    }
+
+    // Process other image formats with sharp, resize and output as AVIF
+    const optimizedBuffer = await sharpInstance
       .resize({
         width: width || undefined,
         height: height || undefined,
         fit: "inside",
         withoutEnlargement: true
       })
+      .avif({ quality: 80, effort: 4 })
       .toBuffer();
     
-    // Return the image as a response
+    // Return the AVIF image as a response
     return new NextResponse(new Blob([new Uint8Array(optimizedBuffer)]), {
       status: 200,
       headers: {
-        "Content-Type": "image/webp", // we can detect original type or default to webp. Let's keep original format or set to jpeg/png. Actually, let's keep it format-agnostic or let sharp auto-resolve. Default sharp output based on input is typically jpeg or same format. Let's explicitly convert to webp for optimization or leave it. 
-        // For a generic resizer, preserving format is best unless forced.
-        "Content-Disposition": `attachment; filename="resized-image.png"`,
+        "Content-Type": "image/avif",
+        "Content-Disposition": `attachment; filename="resized-image.avif"`,
       },
     });
   } catch (error) {
