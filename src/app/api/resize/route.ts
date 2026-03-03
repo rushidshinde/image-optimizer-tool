@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     const optimizedBuffer = await sharpInstance
       .resize({
         width: width || undefined,
-        height: height || undefined,
+        height: width ? undefined : (height || undefined),
         fit: "inside",
         withoutEnlargement: true
       })
