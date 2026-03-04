@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { chromium } from "playwright";
+import chromium from "@sparticuz/chromium";
+import { chromium as playwright } from "playwright-core";
 
 interface AuditRecord {
   src: string;
@@ -26,15 +27,27 @@ export async function POST(req: Request) {
 
     console.log(`[0ms] Launching headless browser...`);
     const browserStartTime = performance.now();
+
+    const isLocal = process.env.VERCEL_REGION === undefined || process.env.VERCEL_REGION === "false";
+    const executablePath = isLocal
+      ? "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
+      : await chromium.executablePath();
+
     // Launch headless chromium using Playwright
-    const browser = await chromium.launch({ headless: true });
+    const browser = await playwright.launch({
+      executablePath,
+      args: isLocal ? [] : chromium.args,
+      // @ts-expect-error property headless is not typed in current version
+      headless: isLocal ? false : chromium.headless,
+    });
     console.log(`[${Math.round(performance.now() - requestStartTime)}ms] Browser launched successfully. (Took ${Math.round(performance.now() - browserStartTime)}ms)`);
 
     // Map to keep track of every image across viewports.
     // Key: image source URL
     const imageMap = new Map<string, AuditRecord>();
 
-    for (const vp of viewports) {
+    try {
+      for (const vp of viewports) {
       console.log(`\n[${Math.round(performance.now() - requestStartTime)}ms] --- Starting Viewport: ${vp.name} (${vp.width}x${vp.height}) ---`);
       const vpStartTime = performance.now();
       
@@ -45,7 +58,8 @@ export async function POST(req: Request) {
       });
 
       // Apply network interception for faster loading based on format/domain
-      await page.route("**/*", (route) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await page.route("**/*", (route: any) => {
         const req = route.request();
         const reqUrl = req.url();
         const resourceType = req.resourceType();
@@ -184,7 +198,8 @@ export async function POST(req: Request) {
 
       // Map the extracted images to our global map
       let skippedCount = 0;
-      viewportImages.forEach((img) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      viewportImages.forEach((img: any) => {
         // Skip base64 or empty sources to keep things clean, but keep HTTP ones
         if (!img.src || img.src.startsWith("data:")) {
            skippedCount++;
@@ -260,8 +275,9 @@ export async function POST(req: Request) {
       await page.close();
       console.log(`[${Math.round(performance.now() - requestStartTime)}ms] --- Finished Viewport: ${vp.name} (Total Viewport Time: ${Math.round(performance.now() - vpStartTime)}ms) ---\n`);
     }
-
-    await browser.close();
+    } finally {
+      await browser.close();
+    }
 
     console.log(`[${Math.round(performance.now() - requestStartTime)}ms] Processing final results array...`);
     // Process our map into the final array and compute the max rendered sizes
